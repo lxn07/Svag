@@ -1,0 +1,224 @@
+local Player = game.Players.LocalPlayer ;
+local Character = Player.Character or Player.CharacterAdded:Wait() ;
+
+local Root = Character:WaitForChild( "HumanoidRootPart" ) ;
+
+local Values = Player:WaitForChild( "Backpack" ):WaitForChild("PlayerValues")
+local PlayerEvents = Player:WaitForChild( "Backpack" ):WaitForChild("PlayerEvents")
+
+local Lib = loadstring(game:HttpGet('https://raw.githubusercontent.com/reaperbark123/hghghg/masterrr/gggggggaff.lua'))()
+local ThemeManager = loadstring(game:HttpGet('https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet('https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua'))()
+
+local Window = Lib:CreateWindow({Title = "L1's Cool Fuckin hub", AutoShow = false, Center = true, }) ;
+local Main = Window:AddTab("Main") ;
+local UITab = Window:AddTab("UI Settings") ;
+
+-- GET QUICK DRAW TIER
+local QuickDrawTier ;
+local QuickDrawList = {
+    "Bronze",
+    "Silver",
+    "Gold",
+    "HoF"
+}
+task.delay(0.1,function()
+    for _,v in next, getgc(true) do
+        if type(v) == "table" then
+            for i2, v2 in pairs(v) do
+                if i2 == "Badges" or v2 == "Badges" then
+                    if type(v2) == "table" then 
+                        for i3, v3 in pairs(v2) do
+                            if i3 == "QuickDraw" then
+                                if table.find(QuickDrawList, v3) then
+                                    QuickDrawTier = v3
+                                end
+                            end
+                        end
+                    end  
+                end
+            end
+        end
+    end
+end)
+
+function AdjustOnPing(Timing, ShotType)
+    if Timing then
+        local AdjustedTiming = math.max(Timing - (game:GetService( 'Stats' ).Network.ServerStatsItem[ 'Data Ping' ]:GetValue() / 1000), 0) ;
+        if QuickDrawTier ~= "Locked" and ShotType == "Standing Shot" and QuickDrawTier ~= 0 and QuickDrawTier then
+            AdjustedTiming -= (QuickDrawTimings[QuickDrawTier]) ;
+        end
+        return AdjustedTiming ;
+    end
+end
+
+_G.ScriptConnections = _G.ScriptConnections and _G.ScriptConnections or {} ;
+for _,Connection in _G.ScriptConnections do
+    Connection:Disconnect() ;
+end ;
+
+-- Main
+local Shooting = Main:AddLeftGroupbox('Shooting Options')
+local Misc = Main:AddLeftGroupbox('Misc')
+local Automation = Main:AddRightGroupbox('Automation')
+
+local UI = {} ;
+
+QuickDrawTimings = {
+    ["Bronze"] = 0.045 ;
+    ["Silver"] = 0.07 ;
+    ["Gold"] = 0.09 ;
+    ["HoF"] = 0.1095 ;
+}
+
+ShotTypes = {
+    ["Standing Shot"] = .55 ;
+    ["Moving Shot"] = 0.673 ;
+    ["Close Floater"] = .3575 ;
+    ["Floater"] = .363 ;
+    ["Layup"] = .44 ;
+    ["Close Layup"] = 0.44;
+    ["Standing Layup"] = .455 ;
+    ["Reverse Layup"] = .688 ;
+
+    ["Moving Dunk"] = .492 ;
+    ['Standing Dunk'] = .41;
+
+    ['Close Post Fade'] = .57 ;
+    ['Post Fade'] = .58 ;
+    ['Post Hook'] = .45 ;
+    ['Close Post Hook'] = .45 ;
+}
+
+UI.Aimbot = Shooting:AddToggle("Aimbot", {
+    Text = 'Aimbot',
+    Default = true,
+    Tooltip = 'Works best with stable ping & fps (also L1 is a cutie)'
+})
+
+UI.AutoBlock = Automation:AddToggle('Auto Block', {
+    Text = 'Auto Block',
+    Default = false,
+})
+
+UI.AutoBlockDelay = Automation:AddSlider('Jump Delay', {
+    Text = 'Block Delay',
+    Default = 0.075,
+    Min = 0,
+    Max = 0.2,
+    Rounding = 3,
+    Compact = false,
+})
+
+UI.AutoBlockDistance = Automation:AddSlider('Jump Distance', {
+    Text = 'Max Jump Distance',
+    Default = 7,
+    Min = 3,
+    Max = 9,
+    Rounding = 3,
+    Compact = false,
+})
+
+local Physical = Player:WaitForChild("Backpack"):WaitForChild("PlayerEvents"):WaitForChild( "Physical" ) ;
+local function AutoBlockInit(Plr)
+    local Values = Plr:WaitForChild("Backpack"):WaitForChild("PlayerValues" , 15) ;
+
+    local Connection ; Connection = Values:WaitForChild( "HandValue" ).Changed:Connect(function()
+        if Values.HandValue.Value == "Shooting" or Values.HandValue.Value == "Dunking" then
+            if UI.AutoBlock.Value == false or Plr == Player then 
+                return ;
+            end ;
+
+            if (Plr.Character.HumanoidRootPart.Position - Root.Position).magnitude > UI.AutoBlockDistance.Value then return end  
+            
+            task.delay(UI.AutoBlockDelay.Value , function()
+                keypress(0x20) ;
+                task.wait(0.045) ;
+                keyrelease(0x20) ;
+
+                -- incase bs happens
+                Physical:FireServer(true , "Block" , workspace.Humanoids[Plr.Name] , Lp.Character.RightHand) ;
+            end) ;
+
+        end ;
+    end) ;
+
+    table.insert(_G.ScriptConnections , Connection) ;
+end ;
+
+-- Run the auto block function so it actually works 
+task.spawn(function()
+    for _,Plr in game.Players:GetPlayers() do
+        AutoBlockInit(Plr) ;
+    end ;
+    game.Players.PlayerAdded:Connect(function(Plr)
+        AutoBlockInit(Plr) ;
+    end) ;
+end)
+
+-- Get Shot Type
+local DunkType ;
+local ShotType ;
+local name;name = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    if method == "FireServer" and self.Name == "Shooting" then
+        ShotType = args[3]
+
+        if type(args[3]) ~= "string" then
+            DunkType = args[2]
+        end
+        return name(self, unpack(args))
+    end
+    return name(self, ...)
+end))
+
+Values.HandValue.Changed:Connect(function()
+    if UI.Aimbot and UI.Aimbot.Value then
+        if Values.HandValue.Value == "Shooting" then
+            local Timing = AdjustOnPing(ShotTypes[ShotType] , ShotType) ;
+            if Timing then
+                -- print("Found a base timing for: " .. Aimbot.ShotType .. " Timing: " .. Timing ) ;
+                task.wait(Timing) ;
+                PlayerEvents.Shooting:FireServer(false , "Shooting" , ShotType) ;
+            -- else
+            --     warn("Didn't find any base timing for: " .. Aimbot.ShotType ) ;
+            end ;
+        elseif Values.HandValue.Value == "Dunking" then
+            local Timing = AdjustOnPing(ShotTypes[DunkType] , DunkType) ;
+            if Timing then
+                -- print("Found a base timing for: ", Aimbot.DunkType .. "Timing: " .. Timing ) ;
+                task.wait(Timing) ;
+                PlayerEvents.Shooting:FireServer(false , DunkType , 1) ;
+            -- else
+            --     warn("Didn't find any base timing for: " .. Aimbot.DunkType) ;
+            end ;
+        end ;
+    end
+end)
+
+-- SECOND OPTION
+local UISettings = UITab:AddLeftTabbox(''):AddTab('UI Settings')
+UISettings:AddLabel('Toggle UI'):AddKeyPicker('ToggleUI', {
+    Text = '',
+    Default = 'LeftControl'
+})
+
+-- other stuff
+UISettings:AddDivider()
+
+Lib.ToggleKeybind = Options.ToggleUI
+
+SaveManager:SetLibrary(Lib)
+ThemeManager:SetLibrary(Lib)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ 'ToggleUI' })
+SaveManager:SetFolder("L1's Cool Fuckin hub")
+
+SaveManager:LoadAutoloadConfig()
+
+SaveManager:BuildConfigSection(UITab)
+
+ThemeManager:SetFolder("L1's Cool Fuckin hub")
+ThemeManager:ApplyToGroupbox(UISettings)
